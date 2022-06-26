@@ -1,0 +1,29 @@
+{
+  "arch": "mips",
+  "cpu": "mips3",
+  "crt-static-respected": true,
+  "data-layout": "E-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64",
+  "executables": true,
+  "features": "+mips1,+mips2,-mips3,-ptr64,-gp64,+xgot,+soft-float",
+  "llvm-target": "mips-unknown-linux-gnu",
+  "max-atomic-width": 32,
+  "linker": "mips-linux-gnu-gcc",
+  "linker-flavor": "gcc",
+  "disable-redzone": true,
+  "position-independent-executables": true,
+  "relro-level": "full",
+  "target-endian": "big",
+  "target-mcount": "_mcount",
+  "pre-link-args": {
+    "gcc": [
+        "-O0"
+    ]
+  },
+  "post-link-args": {
+      "gcc": [
+        "-O0"
+      ]
+  },
+  "os": "none",
+  "target-pointer-width": "32"
+}
