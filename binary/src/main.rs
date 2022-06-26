@@ -7,7 +7,7 @@ extern crate interface;
 pub fn main() {
 
 
-    interface::print!("Hello World\n");
+    interface::println!("Hello World");
 
 	interface::sys::init_screen(48, 32);
 
@@ -33,6 +33,8 @@ pub fn main() {
     };
 
     let mut tetris = tetris::Tetris::init(interface);
+
+
     loop{
         if tetris.run_frame(){
             interface::sys::sleep_delta_mills(17);

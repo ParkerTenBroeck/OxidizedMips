@@ -7,6 +7,7 @@
 #![feature(asm_const)]
 #![feature(naked_functions)]
 #![feature(panic_info_message)]
+#![feature(allow_internal_unstable)]
 
 pub mod sys;
 pub mod core_rust;
