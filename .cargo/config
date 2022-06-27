@@ -1,6 +1,7 @@
 [target.mips]
 rustflags = [
 "-C", "llvm-args=--disable-mips-delay-filler", #we dont have delayslots so full em with nops
+
 "-C", "lto=yes", #optimize at link time
 "-C" ,"embed-bitcode=yes", #this is needed for ^
 

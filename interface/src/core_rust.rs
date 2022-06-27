@@ -82,11 +82,3 @@ impl<'a> core::fmt::Write for Wrapper<'a> {
         Ok(())
     }
 }
-
-#[panic_handler]
-#[no_mangle]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    println!("{}", info);
-    println!("STOPPING");
-    crate::sys::halt()
-}

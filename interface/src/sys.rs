@@ -56,7 +56,7 @@ pub fn sleep_mills(mills: u32){
 }
 
 #[inline(always)]
-pub fn get_nanos() -> u64{
+pub fn get_micros() -> u64{
     syscall_0_2_s::<108>()
 }
 
