@@ -7,7 +7,7 @@ pub struct Tetris{
     input: TetrisInput,
     sound: TetrisSound,
     frame_counter: usize,
-    interface: crate::platform::Interface
+    pub interface: crate::platform::Interface
 }
 
 impl Tetris{
@@ -24,15 +24,15 @@ impl Tetris{
         (x % dif) + min
     }
     
-    pub fn init(interface: crate::platform::Interface) -> Self{
+    pub fn init(mut interface: crate::platform::Interface) -> Self{
         
         Tetris {
-            interface,
-            renderer: TetrisRenderer::init(),
+            renderer: TetrisRenderer::init(&mut interface),
             game: TetrisGame::init(),
             input: TetrisInput::init(),
             sound: TetrisSound::init(),
             frame_counter: 0,
+            interface,
         }
     }
     pub fn run_frame(&mut self) -> bool{
@@ -90,7 +90,6 @@ pub mod util{
         let mut result = 0;
         for i in 0..items.len()-1{
             let base_index = base_c.iter().position(|item|{ **item == items[i]}).unwrap();
-            //base.remove(base_index);
             for i in base_index..items.len()-1{
                 base_c.swap(i, i+1);
             }
@@ -211,7 +210,8 @@ mod game{
         #[inline(always)]
         fn set_data_at_coord(&mut self, data: u8, coord: Coord){
             let y = &mut self.data[coord.y as usize];
-            *y = (*y & (!(7 << (coord.x as u32 * 3)))) | ((data as u32 & 7) << (coord.x * 3))
+            let s = coord.x as u32 * 3;
+            *y = (*y & (!(7u32 << s))) | ((data as u32 & 7) << s)
         }
     }
 
@@ -453,10 +453,10 @@ mod game{
 
 pub mod renderer{
 
-    pub const WIDTH: usize = (32)*8;
-    pub const HEIGHT: usize = (30)*8;
+    pub const WIDTH: u32 = (32)*8;
+    pub const HEIGHT: u32 = (30)*8;
 
-    use crate::{tetris::game::Coord, InterfaceTrait, util::Color};
+    use crate::{tetris::game::Coord, InterfaceTrait, util::Color, platform::Interface};
 
     use super::{Tetris};
 
@@ -465,13 +465,15 @@ pub mod renderer{
     }
 
     impl TetrisRenderer{
-        pub fn init() -> Self {
+        pub fn init(interface: &mut Interface) -> Self {
+            interface.initialize_screen(WIDTH, HEIGHT);
+            
             Self {
             }
         }   
     }
 
-    const CHACATER_SET: &'static [u8; 768] = &[0u8; 768];//include_bytes!("../res/character-tile-set.comp");
+    const CHACATER_SET: &'static [u8; 768] = include_bytes!("../res/character-tile-set.comp");
 
     const TETROMINOE_PALLETE: [[Color; 5]; 8] = [
         [
@@ -580,13 +582,13 @@ pub mod renderer{
             }
             
             for i in 0..8{
-                self.display_number(self.game.piece_stats[i], [15i16, i as i16].into(), 3, Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0))
+                self.display_number(self.game.piece_stats[i], [15i16, i as i16].into(), 3, Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
             }
+            self.display_cpu_usage([15i16, 10 as i16].into(), Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
 
             self.display_number(self.frame_counter, [10i16, 12].into(), 4, Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
 
             self.interface.update_screen();
-            self.frame_counter += 1;
         }
 
         fn draw_cube(&mut self, coords: Coord, cube_pallete: &[Color; 5]){
@@ -639,8 +641,9 @@ pub mod renderer{
             }
         }
 
-        fn display_number(&mut self, mut num: usize, mut location: Coord, leading_zeros: usize, forground: Color, background: Color){
+        fn display_number(&mut self, mut num: usize, mut location: Coord, leading_zeros: usize, forground: Color, background: Color) -> usize{
             let mut iters = 0;
+            let mut num_nums = 0;
             while num > 0{
                 let n = num % 10;
                 num /= 10;
@@ -648,24 +651,42 @@ pub mod renderer{
                 self.draw_chacater(location, n + 16, forground, background);
                 iters += 1;
                 location.x -= 1;
+                num_nums += 1;
             }
             for _ in iters..leading_zeros{
                 self.draw_chacater(location, 16, forground, background);
                 location.x -= 1;
+                num_nums += 1;
             }
+            num_nums
+        }
+
+        fn display_cpu_usage(&mut self, mut pos: Coord, forground: Color, background: Color){
+            let usage = self.interface.cpu_usage() as usize;
+            self.draw_chacater(pos, 5, forground, background);
+            pos.x += 2;
+            if usage >= 10000{
+                pos.x += 1;
+            }
+            self.display_number(usage /100, pos, 2, forground, background) as i16;
+            pos.x += 2; 
+            self.draw_chacater(pos - [1, 0u8].into(), 14, forground, background);
+            pos.x += 1;
+            self.display_number(usage % 100, pos, 2, forground, background);
         }
 
         fn draw_chacater(&mut self, location: Coord, char: usize, forground: Color, background: Color){
+            
             let char = char * 8;
             for y in 0..8{
                 let mut char = CHACATER_SET[char + y];
-                for x in 0..8{
-                    
-                    let color = if char & 1 == 1{
-                        forground
+                for x in 0..8{  
+                    let color;
+                    if char & 1 == 1{
+                        color = forground;
                     }else{
-                        background
-                    };
+                        color = background;   
+                    }
                     if color.is_opaque(){
                         self.interface.set_pixel(x + (location.x*8) as usize, y + (location.y*8) as usize, color);
                     }

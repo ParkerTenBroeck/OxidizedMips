@@ -4,22 +4,29 @@ rustflags = [
 "-C", "lto=yes", #optimize at link time
 "-C" ,"embed-bitcode=yes", #this is needed for ^
 
-"-C", "link-arg=-Wl,--no-compact-branches", #i cant remember
+#"-C", "link-arg=-Wl,--no-compact-branches", #i cant remember
+#"-C", "link-arg=-Wl,--emit-relocs", #puts relocs in generated file
+#"-C", "link-arg=-Wl,--gc-sections,-n,-T,mips/link.x", #marks as relocatable??
+#"-C", "link-arg=-Wl,-u", #no idea what this does
+#"-C", "link-arg=-Wl,-r", #marks as relocatable??
 
-"-C", "link-arg=-Wl,--emit-relocs", #puts relocs in generated file
+"-C", "link-arg=--no-compact-branches", #i cant remember
+"-C", "link-arg=--emit-relocs", #puts relocs in generated file
+"-C", "link-arg=-n",
+"-C", "link-arg=-T",
+"-C", "link-arg=mips/link.x",
+"-C", "link-arg=-u", #no idea what this does
+"-C", "link-arg=-r", #marks as relocatable??
 
-"-C", "link-arg=-Wl,--gc-sections,-n,-T,mips/link.x", #marks as relocatable??
 
-"-C", "link-arg=-Wl,-u", #no idea what this does
-"-C", "link-arg=-Wl,-r", #marks as relocatable??
-#"-C", "target-feature=+crt-static", #compiles as static
+"-C", "target-feature=+crt-static", #compiles as static
 
 
 "-C", "relocation-model=static",
 
-"-C", "link-arg=-fno-delayed-branch",
-"-C", "link-arg=-mips1", #set arch for gcc
-"-C", "link-arg=-nostartfiles", #we dont have to include any starting libraries
+#"-C", "link-arg=-fno-delayed-branch",
+#"-C", "link-arg=-mips1", #set arch for gcc
+#"-C", "link-arg=-nostartfiles", #we dont have to include any starting libraries
 ]
 
 [target.x86_64-unknown-linux-gnu]
