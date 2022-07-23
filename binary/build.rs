@@ -3,6 +3,15 @@ use std::{fs::File, io::Write};
 
 
 fn main(){
+    generate_tile_maps();
+    generate_music();
+}
+
+fn generate_music(){
+    //rustc_fami::parser::read_text("res/sound/tetris_gb.txt".into()).unwrap();
+}
+
+fn generate_tile_maps(){
     let decoder = png::Decoder::new(File::open("res/character-tile-set.png").unwrap());
     let mut reader = decoder.read_info().unwrap();
     
@@ -26,17 +35,4 @@ fn main(){
     }
     let mut file = File::create("res/character-tile-set.comp").unwrap();
     file.write(&new).unwrap();
-
-    arch_specific();
-}
-
-
-#[cfg(not(target_arch = "mips"))]
-fn arch_specific(){
-
-}
-
-#[cfg(target_arch = "mips")]
-fn arch_specific(){
-
 }

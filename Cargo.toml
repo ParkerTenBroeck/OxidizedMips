@@ -2,11 +2,15 @@
 
 members = [
 	"binary",
-	"interface"
+	"interface",
 ]
+# exclude = [
+# 	"build-tool"
+# ]
 
 [profile.release]
 panic="abort"
 
 [profile.dev]
 panic="abort"
+

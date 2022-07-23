@@ -1,5 +1,5 @@
 [package]
-name = "mips_template"
+name = "binary"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,3 +10,7 @@ interface = { path = "../interface" }
 
 [build-dependencies]
 png = {version = "*"}
+rustc-fami = {path = "../../RustcFami"}
+
+[profile.release]
+debug=true

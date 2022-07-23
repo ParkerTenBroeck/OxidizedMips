@@ -1,4 +1,4 @@
-use crate::InterfaceTrait;
+use crate::tetris::InterfaceTrait;
 
 use self::{game::TetrisGame, renderer::TetrisRenderer, input::TetrisInput, sound::TetrisSound};
 
@@ -9,8 +9,8 @@ pub struct Tetris{
     input: TetrisInput,
     sound: TetrisSound,
     debug: DebugInfo,
-    frame_counter: usize,
-    pub interface: crate::platform::Interface
+    frame_counter: u32,
+    pub interface: crate::tetris::platform::Interface
 }
 
 #[derive(Clone, Copy)]
@@ -28,7 +28,6 @@ struct RenderTimes{
     board_time: u64,
     pieces_time: u64,
     text_time: u64,
-    update_time: u64,
 }
 
 struct DebugInfo{
@@ -49,8 +48,8 @@ impl Tetris{
     #[inline(always)]
     pub fn rand_num(&self, min: usize, max: usize) -> usize{
         let mut x = self.frame_counter;
-        x = ((x >> 16) ^ x).wrapping_mul(0x45d9f3b_usize);
-        x = ((x >> 16) ^ x).wrapping_mul(0x45d9f3b_usize);
+        x = ((x >> 16) ^ x).wrapping_mul(0x45d9f3b_u32);
+        x = ((x >> 16) ^ x).wrapping_mul(0x45d9f3b_u32);
         x = (x >> 16) ^ x;
         let x = (x >> 1) as usize;
 
@@ -58,7 +57,7 @@ impl Tetris{
         (x % dif) + min
     }
     
-    pub fn init(mut interface: crate::platform::Interface) -> Self{
+    pub fn init(mut interface: crate::tetris::platform::Interface) -> Self{
         
         Tetris {
             renderer: TetrisRenderer::init(&mut interface),
@@ -88,7 +87,7 @@ impl Tetris{
             total_time: t1.abs_diff(t5),
         });
         self.frame_counter += 1;
-        true
+        !self.interface.key_down('\x08')
     }
 }
 
@@ -155,11 +154,11 @@ mod game{
         pub piece: Option<FallingPiece>,
         pub netx_piece: Option<Tetrominoes>,
         pub board: Board,
-        pub score: usize,
-        pub level: usize,
-        pub lines_cleared: usize,
-        pub combo_count: usize,
-        pub piece_stats: [usize; 8]
+        pub score: u32,
+        pub level: u32,
+        pub lines_cleared: u32,
+        pub combo_count: u32,
+        pub piece_stats: [u32; 8]
     }
 
     impl TetrisGame{
@@ -318,6 +317,11 @@ mod game{
             [coord.x, coord.y]
         }
     }
+    impl From<Coord> for [u32; 2]{
+        fn from(coord: Coord) -> Self{
+            [coord.x as u32, coord.y as u32]
+        }
+    }
     
     #[derive(Copy, Clone)]
     pub enum Tetrominoes{
@@ -415,7 +419,7 @@ mod game{
                         for coord in dropped.1{
                             self.game.board.set_data_at_coord(dropped.0 + 1, coord);
                         }
-                        self.game.score += dropped.2 as usize * 2;
+                        self.game.score += dropped.2 as u32 * 2;
                         new = true;
                     },
                     None => {
@@ -428,7 +432,7 @@ mod game{
                 Some(piece) => {
                     piece.frames_since_last_fall += 1;
 
-                    let mut grav = GRAVITY_TABLE[self.game.level.clamp(0, 29)];
+                    let mut grav = GRAVITY_TABLE[self.game.level.clamp(0, 29) as usize];
                     if self.input.down_pressed(){
                         grav >>= 1;
                         self.game.score += 1;
@@ -503,7 +507,7 @@ pub mod renderer{
     pub const WIDTH: u32 = (32)*8;
     pub const HEIGHT: u32 = (38)*8;
 
-    use crate::{tetris::game::Coord, InterfaceTrait, util::Color, platform::Interface};
+    use crate::{tetris::{tetris::game::Coord, InterfaceTrait, Color, platform::Interface}, util::display::{draw_string, display_number, display_percentage, draw_tiled_character}};
 
     use super::{Tetris};
 
@@ -514,13 +518,14 @@ pub mod renderer{
     impl TetrisRenderer{
         pub fn init(interface: &mut Interface) -> Self {
             interface.initialize_screen(WIDTH, HEIGHT);
+
+
             
             Self {
             }
         }   
     }
 
-    const CHACATER_SET: &'static [u8; 768] = include_bytes!("../res/character-tile-set.comp");
 
     const TETROMINOE_PALLETE: [[Color; 5]; 8] = [
         [
@@ -580,6 +585,7 @@ pub mod renderer{
             Color::from_rgb(160, 160, 160),
         ],
     ];
+    
 
     impl Tetris{
         pub fn render_frame(&mut self){
@@ -587,7 +593,7 @@ pub mod renderer{
 
             let t1 = self.interface.time_micros(); //background
             
-            self.interface.clear_screen(Color::from_rgb(0, 0, 0));
+            self.interface.clear_screen(Color::from_rgb(50, 50, 50));
             
             let t2 = self.interface.time_micros(); //game board
             
@@ -639,24 +645,19 @@ pub mod renderer{
             let t4 = self.interface.time_micros(); //text
             
             for i in 0..8{
-                self.display_number(self.game.piece_stats[i], [15i16, i as i16].into(), 3, Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
+                display_number(self.game.piece_stats[i], [15, i as u32], 3, Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
             }
             self.display_debug_info([13i16, 10 as i16].into(), Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
 
 
             let t5 = self.interface.time_micros(); //update screen
 
-            self.interface.update_screen();
-
-
-            let t6 = self.interface.time_micros();
 
             self.debug.render_times = Option::Some(super::RenderTimes{
                 background_time: t1.abs_diff(t2),
                 board_time: t2.abs_diff(t3),
                 pieces_time: t3.abs_diff(t4),
                 text_time: t4.abs_diff(t5),
-                update_time: t5.abs_diff(t6),
             });
         }
 
@@ -710,78 +711,58 @@ pub mod renderer{
             }
         }
 
-        fn display_number(&mut self, mut num: usize, mut location: Coord, leading_zeros: usize, forground: Color, background: Color) -> usize{
-            let mut iters = 0;
-            let mut num_nums = 0;
-            while num > 0{
-                let n = num % 10;
-                num /= 10;
-                //self. fill_cube(location, forground);
-                self.draw_chacater(location, n + 16, forground, background);
-                iters += 1;
-                location.x -= 1;
-                num_nums += 1;
-            }
-            for _ in iters..leading_zeros{
-                self.draw_chacater(location, 16, forground, background);
-                location.x -= 1;
-                num_nums += 1;
-            }
-            num_nums
-        }
-
         fn display_debug_info(&mut self, pos: Coord, forground: Color, background: Color){
             //self.debug.render_times = Option::None;
             {
                 let mut pos = pos;
-                self.draw_string("Frame   #", pos, forground, background);
+                draw_string("Frame   #", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Tot/CPU      us", pos, forground, background);
+                draw_string("FPS", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Input        us", pos, forground, background);
+                draw_string("Tot/CPU      us", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Sound        us", pos, forground, background);
+                draw_string("Input        us", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Game         us", pos, forground, background);
+                draw_string("Sound        us", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Render       us", pos, forground, background);
+                draw_string("Game         us", pos, forground, background);
+                pos.y += 1;
+                draw_string("Render       us", pos, forground, background);
                 pos.x += 1;
                 pos.y += 1;
-                self.draw_string("Back         us", pos, forground, background);
+                draw_string("Back         us", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Board        us", pos, forground, background);
+                draw_string("Board        us", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Pieces       us", pos, forground, background);
+                draw_string("Pieces       us", pos, forground, background);
                 pos.y += 1;
-                self.draw_string("Text         us", pos, forground, background);
-                pos.y += 1;
-                self.draw_string("Update       us", pos, forground, background);
+                draw_string("Text         us", pos, forground, background);
             }
             {
                 let mut pos = pos + [12i16, 1].into();
+                display_number(self.interface.fps(), pos, 5, forground, background);
+                pos.y += 1;    
                 
                 if let Option::Some(frame_times) = self.debug.frame_times{
-                    self.display_number(frame_times.total_time as usize, pos, 5, forground, background);
+                    display_number(frame_times.total_time as u32, pos, 5, forground, background);
                     pos.y += 1;
-                    self.display_number(frame_times.input_time as usize, pos, 5, forground, background);
+                    display_number(frame_times.input_time as u32, pos, 5, forground, background);
                     pos.y += 1;
-                    self.display_number(frame_times.sound_time as usize, pos, 5, forground, background);
+                    display_number(frame_times.sound_time as u32, pos, 5, forground, background);
                     pos.y += 1;
-                    self.display_number(frame_times.game_time as usize, pos, 5, forground, background);
+                    display_number(frame_times.game_time as u32, pos, 5, forground, background);
                     pos.y += 1;
-                    self.display_number(frame_times.render_time as usize, pos, 5, forground, background);
+                    display_number(frame_times.render_time as u32, pos, 5, forground, background);
                     if let Option::Some(render_times) = self.debug.render_times{
                         pos.x += 1;
                         pos.y += 1;
-                        self.display_number(render_times.background_time as usize, pos, 5, forground, background);
+                        display_number(render_times.background_time as u32, pos, 5, forground, background);
                         pos.y += 1;
-                        self.display_number(render_times.board_time as usize, pos, 5, forground, background);
+                        display_number(render_times.board_time as u32, pos, 5, forground, background);
                         pos.y += 1;
-                        self.display_number(render_times.pieces_time as usize, pos, 5, forground, background);
+                        display_number(render_times.pieces_time as u32, pos, 5, forground, background);
                         pos.y += 1;
-                        self.display_number(render_times.text_time as usize, pos, 5, forground, background);
-                        pos.y += 1;
-                        self.display_number(render_times.update_time as usize, pos, 5, forground, background);
+                        display_number(render_times.text_time as u32, pos, 5, forground, background);
                     }
                 }
                 
@@ -789,153 +770,53 @@ pub mod renderer{
             {
                 let mut pos = pos + [15i16, 0].into();
                 //pos.x += -1;
-                self.display_number(self.frame_counter, pos, 7, forground, background);
-                //pos.x -= -1;
-                pos.y += 1;
+                display_number(self.frame_counter, pos, 7, forground, background);
+                pos.y += 2;
                 self.display_cpu_usage(pos, forground, background);
                 pos.y += 1;
                 
                 if let Option::Some(frame_times) = self.debug.frame_times{
-                    self.display_percentage::<2>(frame_times.input_time as usize, frame_times.total_time as usize, pos, forground, background);
+                    display_percentage::<2>(frame_times.input_time as u32, frame_times.total_time as u32, pos, forground, background);
                     pos.y += 1;
-                    self.display_percentage::<2>(frame_times.sound_time as usize, frame_times.total_time as usize, pos, forground, background);
+                    display_percentage::<2>(frame_times.sound_time as u32, frame_times.total_time as u32, pos, forground, background);
                     pos.y += 1;
-                    self.display_percentage::<2>(frame_times.game_time as usize, frame_times.total_time as usize, pos, forground, background);
+                    display_percentage::<2>(frame_times.game_time as u32, frame_times.total_time as u32, pos, forground, background);
                     pos.y += 1;
-                    self.display_percentage::<2>(frame_times.render_time as usize, frame_times.total_time as usize, pos, forground, background);
+                    display_percentage::<2>(frame_times.render_time as u32, frame_times.total_time as u32, pos, forground, background);
                     if let Option::Some(render_times) = self.debug.render_times{
                         pos.x += 1;
                         pos.y += 1;
-                        self.display_percentage::<2>(render_times.background_time as usize, frame_times.total_time as usize, pos, forground, background);
+                        display_percentage::<2>(render_times.background_time as u32, frame_times.total_time as u32, pos, forground, background);
                         pos.y += 1;
-                        self.display_percentage::<2>(render_times.board_time as usize, frame_times.total_time as usize, pos, forground, background);
+                        display_percentage::<2>(render_times.board_time as u32, frame_times.total_time as u32, pos, forground, background);
                         pos.y += 1;
-                        self.display_percentage::<2>(render_times.pieces_time as usize, frame_times.total_time as usize, pos, forground, background);
+                        display_percentage::<2>(render_times.pieces_time as u32, frame_times.total_time as u32, pos, forground, background);
                         pos.y += 1;
-                        self.display_percentage::<2>(render_times.text_time as usize, frame_times.total_time as usize, pos, forground, background);
-                        pos.y += 1;
-                        self.display_percentage::<2>(render_times.update_time as usize, frame_times.total_time as usize, pos, forground, background);
+                        display_percentage::<2>(render_times.text_time as u32, frame_times.total_time as u32, pos, forground, background);
                     }
                 }
             }
         }
 
         fn display_cpu_usage(&mut self, mut pos: Coord, forground: Color, background: Color){
-            let usage = self.interface.cpu_usage() as usize;
-            self.draw_chacater(pos, 5, forground, background);
+            let usage = self.interface.cpu_usage() as u32;
+            draw_tiled_character(pos, 5, forground, background);
             pos.x += 2;
             if usage >= 10000{
                 pos.x += 1;
             }
-            self.display_number(usage /100, pos, 2, forground, background) as i16;
+            display_number(usage /100, pos, 2, forground, background) as i16;
             pos.x += 2; 
-            self.draw_chacater(pos - [1, 0u8].into(), 14, forground, background);
+            draw_tiled_character(pos - [1, 0u8].into(), 14, forground, background);
             pos.x += 1;
-            self.display_number(usage % 100, pos, 2, forground, background);
-        }
-
-        fn display_percentage<const D: usize>(&mut self, top: usize, bottom: usize,  mut pos: Coord, forground: Color, background: Color){
-            const fn pow(item: usize) -> usize{
-                if item == 1{
-                    10
-                }else{
-                    pow(item -1) * 10
-                }
-            }
-
-            let usage = (top * pow(D) * 100) / bottom;
-            self.draw_chacater(pos, 5, forground, background);
-            pos.x += 2;
-            if usage >= pow(D + 2){
-                pos.x += 1;
-            }
-            self.display_number(usage / pow(D), pos, 2, forground, background) as i16;
-            pos.x += 2; 
-            self.draw_chacater(pos - [1, 0u8].into(), 14, forground, background);
-            pos.x += D as i16 - 1;
-
-            self.display_number(usage % pow(D), pos, D, forground, background);
-        }
-
-        fn draw_string(&mut self, string: &str, mut location: Coord, forground: Color, background: Color){
-               
-            for char in string.as_bytes().iter(){
-                let char = *char as char;
-                let index = match char{
-                    'a'..='z' => {
-                        ((char as usize) - 'a' as usize) + 65
-                    }
-                    'A'..='Z' => {
-                        ((char as usize) - 'A' as usize) + 33
-                    }
-                    '0'..='9' => {
-                        char as usize - '0' as usize + 16
-                    }
-                    ' ' => {
-                        0
-                    }
-                    '#' => 3,
-                    '/' => 15,
-                    _ => {
-                        panic!();
-                    }
-                };
-                if index != 0{
-                    self.draw_chacater(location, index, forground, background);
-                }
-                location.x += 1;
-            }
-        }
-
-        fn draw_chacater(&mut self, location: Coord, char: usize, forground: Color, background: Color){
-            
-            let char = char * 8;
-            for y in 0..8{
-                let mut char = CHACATER_SET[char + y];
-                for x in 0..8{  
-                    let color;
-                    if char & 1 == 1{
-                        color = forground;
-                    }else{
-                        color = background;   
-                    }
-                    if color.is_opaque(){
-                        self.interface.set_pixel(x + (location.x*8) as usize, y + (location.y*8) as usize, color);
-                    }
-                    char >>= 1;
-                }
-            }
-        }
-
-        fn draw_tile(&mut self, location: Coord, tile: &[u8; 256], pallet: &[Color]){
-            for x in 0..8{
-                for y in 0..8{
-                    let color = pallet[tile[x + y*8] as usize];
-                    if color.is_opaque(){
-                        self.interface.set_pixel(x + (location.x*8) as usize, y + (location.y*8) as usize, color);
-                    }
-                }
-            }
-        }
-
-        fn fill_cube(&mut self, coords: Coord, color: Color){
-            let start_x = coords.x as usize * 8;
-            let start_y = coords.y as usize * 8;
-
-            for x in 0..8{
-                for y in 0..8{
-                    if color.is_opaque(){
-                        self.interface.set_pixel(x + start_x, y + start_y, color);
-                    }
-                }
-            }
+            display_number(usage % 100, pos, 2, forground, background);
         }
     }
 }
 
 
 mod input{
-    use crate::InterfaceTrait;
+    use crate::tetris::InterfaceTrait;
 
     use super::Tetris;
 
@@ -1023,8 +904,8 @@ mod input{
 
             self.input.up.update(self.interface.key_down('w') | self.interface.key_down('\x26'));
             self.input.left.update(self.interface.key_down('a') | self.interface.key_down('\x25'));
-            self.input.down.update(self.interface.key_down('s') | self.interface.key_down('\x27'));
-            self.input.right.update(self.interface.key_down('d') | self.interface.key_down('\x28'));
+            self.input.down.update(self.interface.key_down('s') | self.interface.key_down('\x28'));
+            self.input.right.update(self.interface.key_down('d') | self.interface.key_down('\x27'));
             self.input.save.update(self.interface.key_down('c'));
             self.input.drop_down.update(self.interface.key_down(' '));
             

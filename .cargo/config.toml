@@ -24,16 +24,13 @@ rustflags = [
 
 
 "-C", "relocation-model=static",
+#"-Z build-std=core",
 
 #"-C", "link-arg=-fno-delayed-branch",
 #"-C", "link-arg=-mips1", #set arch for gcc
 #"-C", "link-arg=-nostartfiles", #we dont have to include any starting libraries
 ]
 
-[target.x86_64-unknown-linux-gnu]
-rustflags = [
-"-C", "link-arg=-nostartfiles"
-]
 
 [unstable]
 build-std = ["core", "compiler_builtins"]
