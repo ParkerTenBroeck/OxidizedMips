@@ -57,9 +57,9 @@ impl Tetris{
         (x % dif) + min
     }
     
-    pub fn init(mut interface: crate::tetris::platform::Interface) -> Self{
+    pub fn new(mut interface: crate::tetris::platform::Interface) -> Self{
         
-        Tetris {
+        let mut t = Tetris {
             renderer: TetrisRenderer::init(&mut interface),
             game: TetrisGame::init(),
             input: TetrisInput::init(),
@@ -67,7 +67,9 @@ impl Tetris{
             debug: Default::default(),
             frame_counter: 0,
             interface,
-        }
+        };
+        t.init();
+        t
     }
     pub fn run_frame(&mut self) -> bool{
         let t1 = self.interface.time_micros();
@@ -88,6 +90,9 @@ impl Tetris{
         });
         self.frame_counter += 1;
         !self.interface.key_down('\x08')
+    }
+    fn init(&mut self){
+        self.init_renderer();
     }
 }
 
@@ -212,9 +217,9 @@ mod game{
             coords
         }
     }
-
+    #[derive(Clone, Copy)]
     pub struct Board{
-        data: [u32; 40]
+        pub data: [u32; 40]
     }
 
     impl Board{
@@ -249,9 +254,10 @@ mod game{
         fn is_full(&self, coord: Coord) -> bool{
             !self.is_empty(coord)
         }
+        
         #[inline(always)]
         pub fn data_at_coord(&self, coord: Coord) -> u8{
-            ((self.data[coord.y as usize] >> (coord.x * 3)) & 7) as u8
+            ((self.data[coord.y as usize] >> (coord.x + (coord.x << 1))) & 7) as u8
         }
         #[inline(always)]
         fn set_data_at_coord(&mut self, data: u8, coord: Coord){
@@ -277,7 +283,7 @@ mod game{
         }
     }
 
-    #[derive(Default, Copy, Clone)]
+    #[derive(Default, Copy, Clone, PartialEq, Eq)]
     pub struct Coord{
         pub x: i16,
         pub y: i16
@@ -509,21 +515,12 @@ pub mod renderer{
 
     use crate::{tetris::{tetris::game::Coord, InterfaceTrait, Color, platform::Interface}, util::display::{draw_string, display_number, display_percentage, draw_tiled_character}};
 
-    use super::{Tetris};
+    use super::{Tetris, game::FallingPiece};
 
     pub struct TetrisRenderer{
-
-    }
-
-    impl TetrisRenderer{
-        pub fn init(interface: &mut Interface) -> Self {
-            interface.initialize_screen(WIDTH, HEIGHT);
-
-
-            
-            Self {
-            }
-        }   
+        board: Option<super::game::Board>,
+        piece: Option<(u8, [Coord; 4])>,
+        dropped: Option<(u8, [Coord; 4])>
     }
 
 
@@ -585,18 +582,25 @@ pub mod renderer{
             Color::from_rgb(160, 160, 160),
         ],
     ];
-    
+
+    const BACKGROUND_COLOR: Color = Color::from_rgb(50, 50, 50);
+
+    impl TetrisRenderer{
+        pub fn init(interface: &mut Interface) -> Self {
+            interface.initialize_screen(WIDTH, HEIGHT);
+
+            Self {
+                board: Default::default(),
+                piece: Default::default(),
+                dropped: Default::default(),
+            }
+        }   
+    }
 
     impl Tetris{
-        pub fn render_frame(&mut self){
+        pub fn init_renderer(&mut self){
+            self.interface.clear_screen(BACKGROUND_COLOR);
 
-
-            let t1 = self.interface.time_micros(); //background
-            
-            self.interface.clear_screen(Color::from_rgb(50, 50, 50));
-            
-            let t2 = self.interface.time_micros(); //game board
-            
             for x in 0..12{
                 self.draw_cube([x,0i16].into(), &TETROMINOE_PALLETE[7]);
             }
@@ -610,53 +614,90 @@ pub mod renderer{
                 self.draw_cube([11i16,y].into(), &TETROMINOE_PALLETE[7]);
             }
 
-            for x in 0u8..10{
-                for y in 0u8..20{
-                    let data = self.game.board.data_at_coord([x,y + 20].into());
-                    if data == 0{
-                        //self.fill_cube([x+1,y+1].into(), Color::from_rgb(0, 0, 0));
-                    }else{
-                        self.draw_cube([x+1, y+1].into(), &TETROMINOE_PALLETE[data as usize - 1]);
+            self.display_debug_info([13i16, 10 as i16].into(), Color::from_rgb(255, 255, 255), BACKGROUND_COLOR);
+
+        }
+
+        pub fn render_frame(&mut self){
+
+
+            let t1 = self.interface.time_micros(); //background
+            
+            let t2 = self.interface.time_micros(); //game board
+
+            let curr = self.game.get_curr_piece();
+            if self.renderer.piece != curr{
+                if let Option::Some(piece) = self.renderer.piece{
+                    for coord in piece.1{
+                        self.fill_cube(coord - [-1,19i16].into(), BACKGROUND_COLOR);
                     }
                 }
+                if let Option::Some(piece) = self.renderer.dropped{
+                    for coord in piece.1{
+                        self.fill_cube(coord - [-1,19i16].into(), BACKGROUND_COLOR);
+                    }
+                }
+                let curr_dropped = self.game.get_dropped_piece();
+
+                if let Option::Some(piece) = curr_dropped{
+                    for coord in piece.1{
+                        self.ghost_cube(coord - [-1,19i16].into(), TETROMINOE_PALLETE[piece.0 as usize][0])
+                    }
+                    self.renderer.dropped = Option::Some((piece.0,piece.1));
+                }else{
+                    self.renderer.dropped = None;
+                }
+
+                if let Option::Some(piece) = curr{
+                    for coord in piece.1{
+                        self.draw_cube(coord - [-1,19i16].into(), &TETROMINOE_PALLETE[piece.0 as usize])
+                    }
+                }
+                self.renderer.piece = curr;
+
             }
 
 
             let t3 = self.interface.time_micros(); //pieces
 
-            match self.game.get_dropped_piece(){
-                Some(piece) => {
-                    for coord in piece.1{
-                        self.ghost_cube(coord - [-1,19i16].into(), TETROMINOE_PALLETE[piece.0 as usize][0])
-                    }
-                },
-                None => {},
-            }
 
-            match self.game.get_curr_piece(){
-                Some(piece) => {
-                    for coord in piece.1{
-                        self.draw_cube(coord - [-1,19i16].into(), &TETROMINOE_PALLETE[piece.0 as usize])
+            if let Option::Some(old_board) = self.renderer.board{
+                for y in 0u8..20{
+                    let mut data = self.game.board.data[y as usize +20];
+                    let mut old_data = old_board.data[y as usize + 20];
+                    if old_data != data{
+                        for x in 0u8..10{
+                            let t_data = data & 7;
+                            let t_old_data = old_data & 7; 
+                            data >>= 3;
+                            old_data >>= 3;
+                            //let old_data = old_board.data_at_coord([x,y + 20].into());
+                            //let data = self.game.board.data_at_coord([x,y + 20].into());
+                            if t_data != t_old_data{
+                                if t_data != 0{
+                                    self.draw_cube([x+1, y+1].into(), &TETROMINOE_PALLETE[t_data as usize - 1]);
+                                }else{
+                                    self.fill_cube([x+1, y+1].into(), BACKGROUND_COLOR);
+                                }
+                            }
+                        }
                     }
-                },
-                None => {},
+                }
             }
+            self.renderer.board = Option::Some(self.game.board);
 
             let t4 = self.interface.time_micros(); //text
             
-            for i in 0..8{
-                display_number(self.game.piece_stats[i], [15, i as u32], 3, Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
-            }
-            self.display_debug_info([13i16, 10 as i16].into(), Color::from_rgb(255, 255, 255), Color::from_rgb_additive(0, 0, 0));
-
+            self.update_debug_info([13i16, 10 as i16].into(), Color::from_rgb(255, 255, 255), BACKGROUND_COLOR);
+            
 
             let t5 = self.interface.time_micros(); //update screen
 
 
             self.debug.render_times = Option::Some(super::RenderTimes{
                 background_time: t1.abs_diff(t2),
-                board_time: t2.abs_diff(t3),
-                pieces_time: t3.abs_diff(t4),
+                board_time: t3.abs_diff(t4),
+                pieces_time: t2.abs_diff(t3),
                 text_time: t4.abs_diff(t5),
             });
         }
@@ -711,6 +752,19 @@ pub mod renderer{
             }
         }
 
+        fn fill_cube(&mut self, coords: Coord, color: Color){
+            let start_x = coords.x as usize * 8;
+            let start_y = coords.y as usize * 8;
+
+            for x in 0..8{
+                for y in 0..8{
+                    if color.is_opaque(){
+                        self.interface.set_pixel(x + start_x, y + start_y, color);
+                    }
+                }
+            }
+        }
+
         fn display_debug_info(&mut self, pos: Coord, forground: Color, background: Color){
             //self.debug.render_times = Option::None;
             {
@@ -738,6 +792,11 @@ pub mod renderer{
                 pos.y += 1;
                 draw_string("Text         us", pos, forground, background);
             }
+            self.update_debug_info(pos,forground,background);
+
+        }
+
+        fn update_debug_info(&mut self, pos: Coord, forground: Color, background: Color){
             {
                 let mut pos = pos + [12i16, 1].into();
                 display_number(self.interface.fps(), pos, 5, forground, background);

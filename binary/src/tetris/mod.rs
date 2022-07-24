@@ -9,7 +9,7 @@ pub fn run_tetris(){
 
     let interface = Interface::new();
 
-    let mut tetris = tetris::Tetris::init(interface);
+    let mut tetris = tetris::Tetris::new(interface);
 
 
     loop{
