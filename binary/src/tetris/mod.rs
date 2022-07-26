@@ -11,7 +11,6 @@ pub fn run_tetris(){
 
     let mut tetris = tetris::Tetris::new(interface);
 
-
     loop{
         if tetris.run_frame(){
             tetris.interface.update_screen();
@@ -46,15 +45,15 @@ pub mod platform{
     impl InterfaceTrait for Interface{
         fn update_screen(&mut self){
 
-            let start = interface::sys::get_micros();
 
-            if self.key_down('e'){
-                interface::sys::update_screen()
-            }else{
-                interface::sys::update_screen_vsync();
+            interface::sys::update_screen();
+            let start = self.time_micros();
+
+            if !self.key_down('e'){
+                interface::sys::sleep_delta_mills(17);
             }
 
-            let end = interface::sys::get_micros();
+            let end = self.time_micros();
 
 
             let diff = (end.wrapping_sub(start) as i64).abs() as u32;
@@ -93,13 +92,13 @@ pub mod platform{
         }
 
         fn time_micros(&mut self) -> u64 {
-            interface::sys::get_micros()
+            interface::sys::get_nanos()
         }
 
         fn fps(&mut self) -> u32 {
             let mut sum = 0;
             for item in self.fps{
-                sum += item;
+                sum += item / 1000;
             }
             10000000u32.checked_div((sum) / self.fps.len() as u32).unwrap_or_default()
         }

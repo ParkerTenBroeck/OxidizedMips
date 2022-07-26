@@ -689,7 +689,6 @@ pub mod renderer{
             let t4 = self.interface.time_micros(); //text
             
             self.update_debug_info([13i16, 10 as i16].into(), Color::from_rgb(255, 255, 255), BACKGROUND_COLOR);
-            
 
             let t5 = self.interface.time_micros(); //update screen
 

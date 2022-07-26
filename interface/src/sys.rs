@@ -61,6 +61,11 @@ pub fn sleep_mills(mills: u32){
 pub fn get_micros() -> u64{
     unsafe{ syscall_0_2_s::<108>() }
 }
+#[inline(always)]
+pub fn get_nanos() -> u64{
+    unsafe{ syscall_0_2_s::<109>() }
+}
+
 
 #[inline(always)]
 pub fn old_breakpoint(){
