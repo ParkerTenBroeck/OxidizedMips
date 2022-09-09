@@ -2,14 +2,26 @@
 #![no_main]
 #![feature(lang_items)]
 
+
 #![feature(asm_experimental_arch)]
 #![feature(strict_provenance)]
 #![feature(asm_const)]
 #![feature(naked_functions)]
 #![feature(allow_internal_unstable)]
+#![feature(linkage)]
+#![allow(incomplete_features)]
+#![feature(generic_const_exprs)]
 
 pub mod sys;
 pub mod core_rust;
+
+    
+#[no_mangle]
+#[linkage="extern_weak"] 
+pub static _sp: usize = 0;
+#[linkage="extern_weak"] 
+#[no_mangle]
+pub static _heap: usize = 0;
 
 #[no_mangle]
 #[naked]
@@ -33,6 +45,18 @@ pub fn black_box<T>(dummy: T) -> T{
         ret
     }
 }
+#[inline(always)]
+/// # Safety
+/// this is the start of the heap dont touch it if you arent the global allocator ;)
+pub unsafe fn heap_address() -> *mut u8{
+    let ret;
+    core::arch::asm!(
+        "la {0}, _heap",
+        out(reg) ret
+    );
+    ret
+}
+
 
 
 

@@ -3,6 +3,7 @@ use std::{fs::File, io::Write};
 
 
 fn main(){
+    if true{return;}
     generate_tile_maps();
     generate_music();
 }
@@ -34,5 +35,5 @@ fn generate_tile_maps(){
         }
     }
     let mut file = File::create("res/character-tile-set.comp").unwrap();
-    file.write(&new).unwrap();
+    file.write_all(&new).expect("Error while writting to file");
 }

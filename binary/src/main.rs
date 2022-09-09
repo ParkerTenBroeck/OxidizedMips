@@ -1,8 +1,13 @@
 #![no_std]
 #![no_main]
 #![feature(const_for)]
+#![feature(strict_provenance)]
+#![feature(default_alloc_error_handler)]
+
+extern crate alloc;
 
 
+use alloc::boxed::Box;
 use util::display::{Color};
 
 use crate::util::display::draw_chacater;
@@ -11,6 +16,177 @@ extern crate interface;
 
 pub mod tetris;
 pub mod util;
+
+pub mod allocater{
+    use core::{ptr::{NonNull, self}, alloc::{GlobalAlloc, Layout}, mem::{size_of, align_of}, cell::UnsafeCell, fmt::Debug};
+
+    #[repr(C)]
+    struct AllocatedMemory{
+        size: usize,
+        align: usize,
+        data: *mut u8,
+        next: Option<NonNull<AllocatedMemory>>
+    }
+    impl Debug for AllocatedMemory{
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AllocatedMemory")
+            .field("_start_", &(self as *const Self))
+            .field("size", &self.size)
+            .field("align", &self.align)
+            .field("data", &self.data)
+            .field("next", &self.next)
+            .field("_end_", unsafe{&self.alligned_end()})
+            .finish()
+    }
+    }
+
+    impl AllocatedMemory{
+        unsafe fn alligned_end(&self) -> *mut u8{
+            self.data.map_addr(|mut end|{
+                end += self.size;
+                end += align_of::<&Self>() - 1;
+                end &= !(align_of::<&Self>() - 1);
+                end
+            })
+        }
+
+        unsafe fn calc_free_space_ahead(&self) -> usize{
+            if let Option::Some(next) = self.next{
+                next.as_ptr().addr() - self.alligned_end().addr()
+            }else{
+                usize::MAX - (self.data.addr() + self.size)
+            }
+        }
+    }
+    struct AllocatedMemoryIterator{
+        current: Option<NonNull<AllocatedMemory>>
+    }
+    impl Iterator for AllocatedMemoryIterator{
+        type Item = NonNull<AllocatedMemory>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            unsafe{
+                let curr = self.current;
+                if let Option::Some(curr) = curr{
+                    self.current = if let Option::Some(next) = (*curr.as_ptr()).next{
+                        Option::Some(next)
+                    }else{
+                        Option::None
+                    }
+                }
+                return curr;
+                
+            }
+        }
+    }
+    
+    struct SimpleAccocator{
+        head: UnsafeCell<*mut AllocatedMemory>
+    }
+    #[global_allocator]
+    static ALLOCATOR: SimpleAccocator = SimpleAccocator{
+        head: UnsafeCell::new(0 as *mut AllocatedMemory)
+    };
+    unsafe impl Send for SimpleAccocator{ }
+    unsafe impl Sync for SimpleAccocator{ }
+    
+    unsafe impl GlobalAlloc for SimpleAccocator{
+        unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+            if (*self.head.get()).is_null(){
+                *self.head.get() = core::mem::transmute(interface::heap_address());
+                let head = *self.head.get();
+                Self::add_new(head, &layout);
+                return (*head).data                
+            }else{
+                
+                let iter = AllocatedMemoryIterator{
+                    current: Option::Some(NonNull::new_unchecked(*self.head.get())),
+                };
+                for alloc in iter{
+                    let mut start = (*alloc.as_ptr()).alligned_end().addr();
+                    start += size_of::<AllocatedMemory>();
+                    start += layout.align() - 1;
+                    start &= !(layout.align() - 1);
+                    if let Option::Some(next) = (*alloc.as_ptr()).next{
+                        if start < next.addr().into(){
+                            let new = (*alloc.as_ptr()).alligned_end();
+                            let new: *mut AllocatedMemory = core::mem::transmute(new);
+                            Self::add_new(new, &layout);
+                            (*new).next = (*alloc.as_ptr()).next;
+                            (*alloc.as_ptr()).next = Option::Some(NonNull::new_unchecked(new));
+                            return (*new).data
+                        }else{
+                            continue;
+                        }
+                    }else{
+                        let new = (*alloc.as_ptr()).alligned_end();
+                        let new: *mut AllocatedMemory = core::mem::transmute(new);
+                        Self::add_new(new, &layout);
+                        (*alloc.as_ptr()).next = Option::Some(NonNull::new_unchecked(new));
+                        return (*new).data
+                    }
+                }
+                ptr::null_mut()
+            }
+        }
+    
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+
+            if (*self.head.get()).is_null(){
+                panic!();
+            }else{
+                let mut iter = AllocatedMemoryIterator{
+                    current: Option::Some(NonNull::new_unchecked(*self.head.get())),
+                };
+                let mut last = iter.next().unwrap();
+                if (*last.as_ptr()).data == ptr{
+                    (*self.head.get()) = match (*last.as_ptr()).next{
+                        Some(some) => some.as_ptr(),
+                        None => ptr::null_mut(),
+                    };
+                    return;
+                }
+                while let Option::Some(alloc) = iter.next(){
+                        
+                    if (*alloc.as_ptr()).data == ptr{
+                        
+                        (*last.as_ptr()).next = (*alloc.as_ptr()).next;
+                        return;
+                    }else{
+                        
+                        last = alloc;
+                    }
+                }
+            }
+            panic!("to free: {:?}\nhead: {:?}", ptr, (**self.head.get()));
+        }
+    }
+    impl SimpleAccocator{
+        unsafe fn add_new(alloc: *mut AllocatedMemory, layout: &Layout){
+            (*alloc).align = layout.align();
+            (*alloc).size = layout.size();
+            (*alloc).next = Option::None;
+            (*alloc).data = core::mem::transmute(alloc.map_addr(|mut add|{
+                let align_mask_to_round_down = !(layout.align() - 1);
+                add += size_of::<AllocatedMemory>();
+                add += layout.align() - 1;
+                add & align_mask_to_round_down
+            }));
+        }
+        #[allow(unused)]
+        unsafe fn count_allocations(&self) -> usize{
+            if self.head.get().is_null(){
+                0
+            }else{
+                let iter = AllocatedMemoryIterator{
+                    current: Option::Some(NonNull::new_unchecked(*self.head.get())),
+                };
+                iter.count()
+            }
+        }
+    }
+}
+
 
 struct MenuScreen{
     scroll_index: usize,
@@ -23,13 +199,21 @@ impl MenuScreen{
         s
     }
     pub fn init(&mut self){
-        interface::sys::init_screen(crate::tetris::tetris::renderer::WIDTH, crate::tetris::tetris::renderer::HEIGHT);
+        interface::sys::init_screen(crate::tetris::renderer::WIDTH, crate::tetris::renderer::HEIGHT);
     }
     pub fn update(&mut self) -> bool{
         interface::sys::fill_screen(Color::from_rgb(50, 50, 50).into());
         draw_wiggly_text();
+        
+        let mut vec = alloc::vec::Vec::new();
+        for i in 0..interface::sys::rand_range(30, 300){
+            vec.insert((i>>1) as usize, Box::new((i, interface::sys::rand_range(i32::MIN, i32::MAX))))
+        }
+        drop(vec);
+
         self.update_demo_selection();
         interface::sys::update_screen_vsync();
+        
         !interface::sys::is_key_pressed('\x08')
     }
 
@@ -41,7 +225,7 @@ impl MenuScreen{
             while interface::sys::is_key_pressed('\x08'){
                 interface::sys::sleep_mills(1);
             }
-            interface::sys::init_screen(crate::tetris::tetris::renderer::WIDTH, crate::tetris::tetris::renderer::HEIGHT);
+            interface::sys::init_screen(crate::tetris::renderer::WIDTH, crate::tetris::renderer::HEIGHT);
         }
         if interface::sys::is_key_pressed('s'){
 
@@ -116,9 +300,15 @@ fn draw_wiggly_text(){
 fn panic(info: &core::panic::PanicInfo) -> ! {
     interface::println!("{}", info);
     interface::println!("STOPPING");
-    interface::sys::halt()
+    if interface::black_box(false){
+        unsafe{panic_()}
+    }
+    interface::sys::halt();
 }
-
+#[link_name = "core::panicking::panic"]
+fn panic_() -> !{
+    panic!();   
+}
 pub fn sin(angle: u32) -> u16{
 
     const TABLE: [u16; 1024] = [0x8000,0x80c9,0x8192,0x825b,0x8324,0x83ee,0x84b7,0x8580,

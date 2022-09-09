@@ -1,9 +1,11 @@
 [target.mips]
 rustflags = [
+#"-C", "llvm-args=--help-list-hidden",
 "-C", "llvm-args=--disable-mips-delay-filler", #we dont have delayslots so full em with nops
 
 "-C", "lto=yes", #optimize at link time
 "-C" ,"embed-bitcode=yes", #this is needed for ^
+#link time optimization for some reason includes undefined reference to std::panic in debug mode
 
 #"-C", "link-arg=-Wl,--no-compact-branches", #i cant remember
 #"-C", "link-arg=-Wl,--emit-relocs", #puts relocs in generated file
@@ -11,16 +13,18 @@ rustflags = [
 #"-C", "link-arg=-Wl,-u", #no idea what this does
 #"-C", "link-arg=-Wl,-r", #marks as relocatable??
 
-"-C", "link-arg=--no-compact-branches", #i cant remember
+#"-C", "link-arg=--no-compact-branches", #i cant remember
 "-C", "link-arg=--emit-relocs", #puts relocs in generated file
-"-C", "link-arg=-n",
+#"-C", "link-arg=-n",
+
 "-C", "link-arg=-T",
-"-C", "link-arg=mips/link.x",
-"-C", "link-arg=-u", #no idea what this does
-"-C", "link-arg=-r", #marks as relocatable??
+"-C", "link-arg=mips/link.map",
+
+#"-C", "link-arg=-u", #no idea what this does
+#"-C", "link-arg=-r", #marks as relocatable??
 
 
-"-C", "target-feature=+crt-static", #compiles as static
+#"-C", "target-feature=+crt-static", #compiles as static
 
 
 "-C", "relocation-model=static",
@@ -33,7 +37,7 @@ rustflags = [
 
 
 [unstable]
-build-std = ["core", "compiler_builtins"]
+build-std = ["core", "compiler_builtins", "alloc"]
 
 [build]
 target ="mips.json"

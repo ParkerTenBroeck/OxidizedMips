@@ -16,12 +16,12 @@
   "target-mcount": "_mcount",
   "pre-link-args": {
     "gcc": [
-        "-O0"
+        "-O3"
     ]
   },
   "post-link-args": {
       "gcc": [
-        "-O0"
+        "-O3"
       ]
   },
   "os": "none",

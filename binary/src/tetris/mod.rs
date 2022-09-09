@@ -1,6 +1,8 @@
 use crate::util::display::Color;
 
-pub mod tetris;
+pub use tetris::*;
+mod tetris;
+
 
 
 
@@ -56,14 +58,14 @@ pub mod platform{
             let end = self.time_micros();
 
 
-            let diff = (end.wrapping_sub(start) as i64).abs() as u32;
+            let diff = (end.wrapping_sub(start) as i64) as u32;
             if let Option::Some(start_stuff) = self.cpu_time_start{
                 let sleep_time = diff;
-                let cpu_time = (start.wrapping_sub(start_stuff) as i32).abs() as u32;
+                let cpu_time = (start.wrapping_sub(start_stuff) as i32) as u32;
                 self.cpu_usage[self.index] = (((cpu_time as u64) * 10000) / (sleep_time as u64 + cpu_time as u64)) as u32;
                 self.fps[self.index] = sleep_time + cpu_time;
                 self.index += 1;
-                self.index = self.index % 64;
+                self.index %= 64;
             }
             self.cpu_time_start = Option::Some(end);
         }
