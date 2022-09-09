@@ -10,7 +10,7 @@ interface = { path = "../interface" }
 
 [build-dependencies]
 png = {version = "*"}
-rustc-fami = {path = "../../RustcFami"}
+#rustc-fami = {path = "../../RustcFami"}
 
 [profile.release]
 debug=true
