@@ -8,7 +8,7 @@ pub struct Tetris{
     game: TetrisGame,
     input: TetrisInput,
     sound: TetrisSound,
-    debug: DebugInfo,
+    debug: Option<DebugInfo>,
     frame_counter: u32,
     pub interface: crate::tetris::platform::Interface
 }
@@ -30,17 +30,10 @@ struct RenderTimes{
     text_time: u64,
 }
 
+#[derive(Default)]
 struct DebugInfo{
     frame_times: Option<FrameTimes>,
     render_times: Option<RenderTimes>
-}
-impl Default for DebugInfo{
-    fn default() -> Self {
-        Self { 
-            frame_times: Default::default(), 
-            render_times: Default::default() 
-        }
-    }
 }
 
 impl Tetris{
@@ -81,13 +74,16 @@ impl Tetris{
         let t4 = self.interface.time_micros();
         self.render_frame();
         let t5 = self.interface.time_micros();
-        self.debug.frame_times = Option::Some(FrameTimes{
-            input_time: t1.abs_diff(t2),
-            sound_time: t2.abs_diff(t3),
-            game_time: t3.abs_diff(t4),
-            render_time: t4.abs_diff(t5),
-            total_time: t1.abs_diff(t5),
-        });
+        if let Some(debug) = &mut self.debug{
+
+            debug.frame_times = Option::Some(FrameTimes{
+                input_time: t1.abs_diff(t2),
+                sound_time: t2.abs_diff(t3),
+                game_time: t3.abs_diff(t4),
+                render_time: t4.abs_diff(t5),
+                total_time: t1.abs_diff(t5),
+            });
+        }
         self.frame_counter += 1;
         !self.interface.key_down('\x08')
     }
@@ -692,13 +688,14 @@ pub mod renderer{
 
             let t5 = self.interface.time_micros(); //update screen
 
-
-            self.debug.render_times = Option::Some(super::RenderTimes{
-                background_time: t1.abs_diff(t2),
-                board_time: t3.abs_diff(t4),
-                pieces_time: t2.abs_diff(t3),
-                text_time: t4.abs_diff(t5),
-            });
+            if let Some(debug) = &mut self.debug{
+                debug.render_times = Option::Some(super::RenderTimes{
+                    background_time: t1.abs_diff(t2),
+                    board_time: t3.abs_diff(t4),
+                    pieces_time: t2.abs_diff(t3),
+                    text_time: t4.abs_diff(t5),
+                });
+            }
         }
 
         fn draw_cube(&mut self, coords: Coord, cube_pallete: &[Color; 5]){
@@ -765,7 +762,9 @@ pub mod renderer{
         }
 
         fn display_debug_info(&mut self, pos: Coord, forground: Color, background: Color){
-            //self.debug.render_times = Option::None;
+            if self.debug.is_none(){
+                return
+            }
             {
                 let mut pos = pos;
                 draw_string("Frame   #", pos, forground, background);
@@ -796,12 +795,15 @@ pub mod renderer{
         }
 
         fn update_debug_info(&mut self, pos: Coord, forground: Color, background: Color){
+            if self.debug.is_none(){
+                return
+            }
             {
                 let mut pos = pos + [12i16, 1].into();
                 display_number(self.interface.fps(), pos, 5, forground, background);
                 pos.y += 1;    
                 
-                if let Option::Some(frame_times) = self.debug.frame_times{
+                if let Option::Some(frame_times) = self.debug.as_ref().unwrap().frame_times{
                     display_number(frame_times.total_time as u32, pos, 5, forground, background);
                     pos.y += 1;
                     display_number(frame_times.input_time as u32, pos, 5, forground, background);
@@ -811,7 +813,7 @@ pub mod renderer{
                     display_number(frame_times.game_time as u32, pos, 5, forground, background);
                     pos.y += 1;
                     display_number(frame_times.render_time as u32, pos, 5, forground, background);
-                    if let Option::Some(render_times) = self.debug.render_times{
+                    if let Option::Some(render_times) = self.debug.as_ref().unwrap().render_times{
                         pos.x += 1;
                         pos.y += 1;
                         display_number(render_times.background_time as u32, pos, 5, forground, background);
@@ -833,7 +835,7 @@ pub mod renderer{
                 self.display_cpu_usage(pos, forground, background);
                 pos.y += 1;
                 
-                if let Option::Some(frame_times) = self.debug.frame_times{
+                if let Option::Some(frame_times) = self.debug.as_ref().unwrap().frame_times{
                     display_percentage::<2>(frame_times.input_time as u32, frame_times.total_time as u32, pos, forground, background);
                     pos.y += 1;
                     display_percentage::<2>(frame_times.sound_time as u32, frame_times.total_time as u32, pos, forground, background);
@@ -841,7 +843,7 @@ pub mod renderer{
                     display_percentage::<2>(frame_times.game_time as u32, frame_times.total_time as u32, pos, forground, background);
                     pos.y += 1;
                     display_percentage::<2>(frame_times.render_time as u32, frame_times.total_time as u32, pos, forground, background);
-                    if let Option::Some(render_times) = self.debug.render_times{
+                    if let Option::Some(render_times) = self.debug.as_ref().unwrap().render_times{
                         pos.x += 1;
                         pos.y += 1;
                         display_percentage::<2>(render_times.background_time as u32, frame_times.total_time as u32, pos, forground, background);

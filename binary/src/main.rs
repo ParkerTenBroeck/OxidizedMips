@@ -205,11 +205,11 @@ impl MenuScreen{
         interface::sys::fill_screen(Color::from_rgb(50, 50, 50).into());
         draw_wiggly_text();
         
-        let mut vec = alloc::vec::Vec::new();
-        for i in 0..interface::sys::rand_range(30, 300){
-            vec.insert((i>>1) as usize, Box::new((i, interface::sys::rand_range(i32::MIN, i32::MAX))))
-        }
-        drop(vec);
+        // let mut vec = alloc::vec::Vec::new();
+        // for i in 0..interface::sys::rand_range(30, 300){
+        //     vec.insert((i>>1) as usize, Box::new((i, interface::sys::rand_range(i32::MIN, i32::MAX))))
+        // }
+        // drop(vec);
 
         self.update_demo_selection();
         interface::sys::update_screen_vsync();
@@ -237,7 +237,7 @@ impl MenuScreen{
 }
 
 #[no_mangle]
-pub fn main() {
+pub fn main(){
     let mut menu = MenuScreen::new();
     while menu.update(){
         //interface::sys::sleep_delta_mills(16);
@@ -300,15 +300,9 @@ fn draw_wiggly_text(){
 fn panic(info: &core::panic::PanicInfo) -> ! {
     interface::println!("{}", info);
     interface::println!("STOPPING");
-    if interface::black_box(false){
-        unsafe{panic_()}
-    }
     interface::sys::halt();
 }
-#[link_name = "core::panicking::panic"]
-fn panic_() -> !{
-    panic!();   
-}
+
 pub fn sin(angle: u32) -> u16{
 
     const TABLE: [u16; 1024] = [0x8000,0x80c9,0x8192,0x825b,0x8324,0x83ee,0x84b7,0x8580,

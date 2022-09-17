@@ -3,7 +3,7 @@ rustflags = [
 #"-C", "llvm-args=--help-list-hidden",
 "-C", "llvm-args=--disable-mips-delay-filler", #we dont have delayslots so full em with nops
 
-"-C", "lto=yes", #optimize at link time
+#"-C", "lto=yes", #optimize at link time
 "-C" ,"embed-bitcode=yes", #this is needed for ^
 #link time optimization for some reason includes undefined reference to std::panic in debug mode
 

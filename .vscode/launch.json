@@ -4,24 +4,24 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        {
-            "type": "by-gdb",
-            "request": "launch",
-            "name": "Launch(remote)",
-            "program": "${workspaceRoot}/mips/bin/com.o",
-            "cwd": "${workspaceRoot}",
-            "debuggerPath": "gdb-multiarch",
-            "remote": {
-                "enabled": true,
-                "address": ":1234",
-                "mode": "remote",
-            },
+        // {
+        //     "type": "by-gdb",
+        //     "request": "launch",
+        //     "name": "Launch(remote)",
+        //     "program": "${workspaceRoot}/mips/bin/com.o",
+        //     "cwd": "${workspaceRoot}",
+        //     "debuggerPath": "gdb-multiarch",
+        //     "remote": {
+        //         "enabled": true,
+        //         "address": ":1234",
+        //         "mode": "remote",
+        //     },
             
-            "commandsBeforeExec": [
-                "restore ${workspaceRoot}/mips/bin/tmp.bin binary 0"
-            ],
+        //     "commandsBeforeExec": [
+        //         "restore ${workspaceRoot}/mips/bin/tmp.bin binary 0"
+        //     ],
             
-        },
+        // },
         {
             "type": "gdb",
             "request": "attach",
@@ -30,15 +30,42 @@
             "target": ":1234",
             "remote": true,
             "cwd": "${workspaceRoot}",
-            "valuesFormatting": "parseText",
+            "valuesFormatting": "prettyPrinters",
             "stopAtEntry": true,
             "stopAtConnect": true,
+            "gdbpath": "rust-gdb",
             "autorun": [
-                "restore ${workspaceRoot}/mips/bin/tmp.bin binary 0"
+                "restore ${workspaceRoot}/mips/bin/tmp.bin binary 0x10"
             ],
-            "gdbpath": "gdb-multiarch"
+            
+            "debugger_args": [
+                "--eval-command", "set debug remote 1"
+            ],
+            "env": {
+                "RUST_GDB": "gdb-multiarch"
+            }
         },
-        
+        {
+            "type": "by-gdb",
+            "request": "launch",
+            "name": "Launch(remote)",
+            "program": "${workspaceRoot}/mips/bin/com.o",
+            "cwd": "${workspaceRoot}",
+            "debuggerPath": "gdb-multiarch",
+            "commandsBeforeExec": [
+                //"target remote: 1234",
+                //"restore ${workspaceRoot}/mips/bin/tmp.bin binary 0x10"
+            ],
+            "debuggerArgs": [
+                "--eval-command", "set debug remote 1"
+            ],
+            "remote": {
+                "enabled": true,
+                "address": ":1234",
+                "mode": "remote",
+                "execfile": "${workspaceRoot}/mips/bin/com.o"
+            }
+        },
         {
             "type": "lldb",
             "request": "custom",

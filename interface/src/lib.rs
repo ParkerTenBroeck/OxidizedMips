@@ -26,16 +26,23 @@ pub static _heap: usize = 0;
 #[no_mangle]
 #[naked]
 #[link_section = ".text.start"]
-pub extern "C" fn __start() -> !{
+pub extern "C" fn _start() -> !{
     unsafe{
         core::arch::asm!{
+            ".set noat",
             "la $gp, _gp",
             "la $sp, _sp ",
             "move $fp, $sp",
             "jal main",
-            "syscall 0", options(noreturn)
+            "1:",
+            "syscall 0",
+            "b 1b", options(noreturn),
         }
     }
+}
+
+extern "C" {
+    pub fn main();
 }
 
 pub fn black_box<T>(dummy: T) -> T{
