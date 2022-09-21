@@ -1,8 +1,8 @@
 #[no_mangle]
 #[inline(always)]
 /// # Safety
-pub unsafe extern "C" fn memset(data: *mut u8, val: u8, size: usize) -> *mut core::ffi::c_void{
-    for i in 0..size{
+pub unsafe extern "C" fn memset(data: *mut u8, val: u8, size: usize) -> *mut core::ffi::c_void {
+    for i in 0..size {
         *data.add(i) = val;
     }
     core::mem::transmute(data)
@@ -12,18 +12,17 @@ pub unsafe extern "C" fn memset(data: *mut u8, val: u8, size: usize) -> *mut cor
 #[inline(always)]
 /// # Safety
 pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *mut u8, size: usize) {
-    for i in 0..size{
+    for i in 0..size {
         *dest.add(i) = *src.add(i);
     }
 }
-
 
 #[no_mangle]
 #[inline(always)]
 /// # Safety
 pub unsafe extern "C" fn memcmp(str1: *mut u8, str2: *mut u8, size: usize) -> core::ffi::c_int {
-    for i in 0..size{
-        match (*str1.add(i)).cmp(&*str2.add(i)){
+    for i in 0..size {
+        match (*str1.add(i)).cmp(&*str2.add(i)) {
             core::cmp::Ordering::Less => return -1,
             core::cmp::Ordering::Equal => return 1,
             core::cmp::Ordering::Greater => continue,
@@ -36,23 +35,22 @@ pub unsafe extern "C" fn memcmp(str1: *mut u8, str2: *mut u8, size: usize) -> co
 #[inline(always)]
 /// # Safety
 pub unsafe extern "C" fn memmove(mut dest: *mut u8, mut src: *mut u8, count: usize) {
-    if src.addr() < dest.addr(){
+    if src.addr() < dest.addr() {
         dest = dest.add(count);
         src = src.add(count);
-        for _ in 0..count{
+        for _ in 0..count {
             dest = dest.sub(1);
             src = src.sub(1);
             *dest = *src;
         }
-    }else{
-        for _ in 0..count{
+    } else {
+        for _ in 0..count {
             *dest = *src;
             dest = dest.add(1);
             src = src.add(1);
         }
     }
 }
-
 
 pub const BUFF_SIZE: usize = 2000;
 
@@ -88,10 +86,7 @@ pub struct Wrapper<'a> {
 
 impl<'a> Wrapper<'a> {
     pub fn new(buf: &'a mut [u8]) -> Self {
-        Wrapper {
-            buf,
-            offset: 0,
-        }
+        Wrapper { buf, offset: 0 }
     }
 }
 
@@ -102,7 +97,9 @@ impl<'a> core::fmt::Write for Wrapper<'a> {
         // Skip over already-copied data
         let remainder = &mut self.buf[self.offset..];
         // Check if there is space remaining (return error instead of panicking)
-        if remainder.len() < bytes.len() { return Err(core::fmt::Error); }
+        if remainder.len() < bytes.len() {
+            return Err(core::fmt::Error);
+        }
         // Make the two slices the same length
         let remainder = &mut remainder[..bytes.len()];
         // Copy
